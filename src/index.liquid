@@ -1,56 +1,136 @@
 ---
 layout: default
-
-# keep it short! shown in the header
-title: Demo of the Demo
-
+title: Strapi on Digital Ocean + Netlify Functions
 # these are all optional and add links to the footer
-repo: learnwithjason/demo-base
-episode: https://www.learnwithjason.dev/creating-css-variable-font-text-effects
-tutorial: https://codepen.io/jlengstorf/pen/QWbdLjb
+# repo: learnwithjason/corgi-pets-frontend
+# episode: https://www.learnwithjason.dev/build-jamstack-apps-with-custom-apis
+# tutorial:
 ---
 
-<!-- any HTML we want can go in here, including style and script tags -->
 <style>
-  .wrapper {
-    align-items: center;
+  .corgi-kennel {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, 300px);
+    text-align: center;
+  }
+  .corgi img {
+    height: 250px;
+    width: 100%;
+    object-fit: cover;
+  }
+  .credit {
+    color: var(--text-muted);
+    font-weight: 200;
+    margin-top: 0;
+  }
+  .reactions {
     display: flex;
-    height: 50vh;
-    justify-content: center;
-    min-height: 300px;
-    overflow: hidden;
+    justify-content: space-around;
   }
-
-  h2 {
-    color: #fff;
-    font-family: mallory, futura, arial black, sans-serif;
-    font-size: 22vw;
-    font-weight: 800;
-    letter-spacing: -0.1em;
-    line-height: 1.4;
-    padding: 0 0.25em;
-    text-shadow: 0.1vw 0.1vw #4f4f4f55, 0.1vw -0.1vw #4f4f4f55,
-      -0.1vw 0.1vw #4f4f4f55, -0.1vw -0.1vw #4f4f4f55;
+  .pet,
+  .boop {
+    display: flex;
+    flex-direction: column;
   }
-
-  @supports ((-webkit-background-clip: text) and (-webkit-text-stroke: 5vw)) {
-    h2 {
-      background: linear-gradient(160deg, #d459ab 0%, #ffdf37 50%, #a6fffa 90%);
-      -webkit-background-clip: text;
-      -webkit-text-stroke: 3.25vw transparent;
-    }
+  .count {
+    color: var(--black);
+    font-size: 1.5rem;
+    font-weight: 900;
   }
-
-  @media (min-width: 1000px) {
-    h2 {
-      font-size: 220px;
-      -webkit-text-stroke: 32.5px transparent;
-    }
+  .pet button,
+  .boop button {
+    background: var(--light-gray);
+    border: none;
+    border-radius: 0.25rem;
+    color: var(--gray-dark);
+    font-family: var(--font-family);
+    font-size: 1rem;
+    font-weight: 900;
+    padding: 0.25rem 0.5rem;
   }
 </style>
 
-<h1>This Is a Demo of the Demo</h1>
+<h1>Look at These Good Doggos</h1>
 
-<div class="wrapper">
-  <h2 contenteditable spellcheck="false">boop.</h2>
-</div>
+<div class="corgi-kennel"></div>
+
+<template id="corgi">
+  <div class="corgi">
+    <img src="" alt="" />
+    <p class="credit"></p>
+    <div class="reactions">
+      <div class="pet">
+        <span class="count"></span>
+        <button>Pet This Corgo</button>
+      </div>
+      <div class="boop">
+        <span class="count"></span>
+        <button>Boop This Corgo</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+  async function addReaction(corgi, node, type) {
+    // save the reaction to our backend using a serverless function
+    const response = await fetch('/.netlify/functions/add-reaction', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type,
+        corgi,
+      }),
+    })
+      .then((res) => res.json())
+      .catch((err) => console.error(err));
+
+    // increment the counter’s value by 1
+    const countNode = node.querySelector('.count');
+    countNode.innerText = Number(countNode.innerText) + 1;
+  }
+
+  async function loadCorgis() {
+    const data = await fetch('/.netlify/functions/load-corgis')
+      .then((res) => res.json())
+      .catch((err) => console.error(err));
+
+    const template = document.getElementById('corgi');
+    const container = document.querySelector('.corgi-kennel');
+
+    data.forEach((corgi) => {
+      // use the template to add the corgi information into a new DOM node
+      const node = template.content.cloneNode(true);
+
+      const img = node.querySelector('img');
+      img.src = corgi.photo;
+      img.alt = corgi.title;
+
+      node.querySelector('.credit').innerText = `Photo by ${corgi.credit}`;
+
+      // show the current reaction counts for each corgi
+      const pets = corgi.reactions.filter((r) => r.type === 'pet');
+      const boops = corgi.reactions.filter((r) => r.type === 'boop');
+      const pet = node.querySelector('.pet');
+      const boop = node.querySelector('.boop');
+
+      pet.querySelector('.count').innerText = pets.length;
+      boop.querySelector('.count').innerText = boops.length;
+
+      // when someone clicks a reaction button, save it and update the count
+      const petHandler = () => addReaction(corgi.id, pet, 'pet');
+      const boopHandler = () => addReaction(corgi.id, boop, 'boop');
+
+      pet.querySelector('button').addEventListener('click', petHandler);
+      boop.querySelector('button').addEventListener('click', boopHandler);
+
+      // add the corgi to the page! show me that good doggo!
+      container.appendChild(node);
+    });
+  }
+
+  loadCorgis();
+</script>
